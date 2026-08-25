@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Admin Dashboard - PMI Chennai Chapter</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #eaedf2; color: #333; }
+  .gate-container { max-width: 380px; margin: 80px auto; background: #fff; padding: 30px 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); text-align: center; box-sizing: border-box; }
+  .brand-title { color: #002855; font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .sub-title { font-size: 12px; color: #64748b; margin: 0 0 20px; }
+  input[type="password"] { width: 100%; padding: 12px; font-size: 15px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; text-align: center; }
+  button { width: 100%; padding: 12px; font-size: 15px; font-weight: bold; background: #002855; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .gate-error { margin-top: 10px; font-size: 13px; color: #b91c1c; min-height: 16px; }
+
+  #dashboard-container { display: none; max-width: 960px; margin: 0 auto; }
+  .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .dash-title { color: #002855; font-size: 20px; font-weight: 700; margin: 0; }
+  .btn-refresh { width: auto; padding: 8px 16px; font-size: 13px; }
+  .dash-updated { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  th, td { padding: 10px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid #eef1f5; }
+  th { background: #4c158a; color: #fff; font-weight: 600; white-space: nowrap; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #f8fafc; }
+  .empty-note { text-align: center; padding: 30px; color: #94a3b8; font-size: 13px; }
+
+  @media (max-width: 700px) {
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr { background: #fff; border-radius: 10px; margin-bottom: 12px; padding: 10px 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    td { border: none; padding: 4px 0; display: flex; justify-content: space-between; }
+    td::before { content: attr(data-label); font-weight: 600; color: #64748b; }
+  }
+
+  .tab-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tab-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; background: #fff; color: #002855; border: 1px solid #cbd5e1; border-radius: 20px; cursor: pointer; width: auto; }
+  .tab-btn.active { background: #002855; color: #fff; border-color: #002855; }
+
+  #volunteers-view { display: none; }
+  .add-volunteer-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .add-volunteer-form input { flex: 1; min-width: 120px; padding: 9px 10px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px; }
+  .add-volunteer-form button { width: auto; padding: 9px 16px; font-size: 13px; }
+  .vol-actions button { width: auto; padding: 5px 10px; font-size: 12px; margin-left: 4px; }
+  .btn-vol-edit { background: #fff; color: #002855; border: 1px solid #002855; }
+  .btn-vol-delete { background: #fff; color: #b91c1c; border: 1px solid #b91c1c; }
+  .btn-vol-save { background: #065f46; }
+  .vol-inline-input { width: 90px; padding: 5px 7px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 4px; }
+  .vol-status-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
+  .vol-status-msg.error { color: #b91c1c; }
+  .vol-status-msg.success { color: #065f46; }
+</style>
+</head>
+<body>
+
+<div class="gate-container" id="gate-view">
+  <div class="brand-title">PMI Chennai Chapter</div>
+  <div class="sub-title">Admin Dashboard</div>
+  <input type="password" id="admin-key-input" placeholder="Admin Access Key" autocomplete="off" onkeydown="if(event.key==='Enter'){unlockDashboard();}">
+  <button id="unlock-btn" onclick="unlockDashboard()">Unlock Dashboard</button>
+  <div class="gate-error" id="gate-error"></div>
+</div>
+
+<div id="dashboard-container">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">Admin Dashboard</h1>
+      <div class="dash-updated" id="last-updated"></div>
+    </div>
+    <button class="btn-refresh" onclick="loadActiveTab()">↻ Refresh</button>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-btn-attendance" onclick="switchTab('attendance')">Attendance</button>
+    <button class="tab-btn" id="tab-btn-volunteers" onclick="switchTab('volunteers')">Volunteers</button>
+  </div>
+
+  <div id="attendance-view">
+    <div id="table-wrapper"></div>
+  </div>
+
+  <div id="volunteers-view">
+    <div class="add-volunteer-form">
+      <input type="text" id="new-vol-name" placeholder="Name">
+      <input type="text" id="new-vol-pin" placeholder="PIN (min 4 chars)">
+      <button onclick="submitAddVolunteer()">+ Add Volunteer</button>
+    </div>
+    <div class="vol-status-msg" id="vol-status-msg"></div>
+    <div id="volunteers-table-wrapper"></div>
+  </div>
+</div>
+
+<script>
+  // ================================================================================
+  // SERVER CALL LAYER — replaces google.script.run for the standalone app.
+  // Points at your deployed Apps Script /exec URL, which now also serves doPost()
+  // (see api_router.gs). Set this once per environment.
+  // ================================================================================
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxF3_sgTH2GA8nebJ3XG3hj3d4VIchs4nOUNgM9KdjCSGVYQ1lJMD1HNdpyAeo-68QEgQ/exec';
+
+  /**
+   * Calls a whitelisted server function by name. Mirrors the shape of
+   * google.script.run: resolves with whatever the Apps Script function
+   * returned, or rejects on network/server failure.
+   *
+   * IMPORTANT: Content-Type is deliberately 'text/plain' (not application/json)
+   * so the request stays a CORS "simple request" and skips preflight — Apps
+   * Script has no doOptions() to answer one. See api_router.gs for the
+   * matching server-side note.
+   */
+  async function callServer(fn, args) {
+    let response;
+    try {
+      response = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ fn: fn, args: args || [] })
+      });
+    } catch (networkErr) {
+      throw new Error('Network error — check your connection and try again.');
+    }
+
+    if (!response.ok) {
+      throw new Error('Server returned HTTP ' + response.status);
+    }
+
+    const data = await response.json();
+    if (data && data.success === false && data.message && data.message.indexOf('Server error:') === 0) {
+      // Surfaces backend exceptions (e.g. bad args) the same way a
+      // withFailureHandler would have.
+      throw new Error(data.message);
+    }
+    return data;
+  }
+
+  // ================================================================================
+  // Everything below is your original admin.html logic, with each
+  // google.script.run(...).fnName(args) call swapped for callServer('fnName', [args]).
+  // No other behavior changes.
+  // ================================================================================
+
+  let adminToken = null;
+  let refreshInterval = null;
+
+  function unlockDashboard() {
+    const input = document.getElementById('admin-key-input');
+    const btn = document.getElementById('unlock-btn');
+    const errDiv = document.getElementById('gate-error');
+    const key = input.value.trim();
+
+    if (!key) { errDiv.textContent = 'Please enter the admin access key.'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+    errDiv.textContent = '';
+
+    callServer('verifyAdminAccessKey', [key])
+      .then(function(response) {
+        btn.disabled = false;
+        btn.textContent = 'Unlock Dashboard';
+
+        if (response.success) {
+          adminToken = response.token;
+          document.getElementById('gate-view').style.display = 'none';
+          document.getElementById('dashboard-container').style.display = 'block';
+          loadActiveTab();
+          refreshInterval = setInterval(loadActiveTab, 30000);
+        } else {
+          errDiv.textContent = response.message || 'Incorrect key.';
+          input.value = '';
+        }
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Unlock Dashboard';
+        errDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  let currentTab = 'attendance';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tab-btn-attendance').classList.toggle('active', tab === 'attendance');
+    document.getElementById('tab-btn-volunteers').classList.toggle('active', tab === 'volunteers');
+    document.getElementById('attendance-view').style.display = tab === 'attendance' ? 'block' : 'none';
+    document.getElementById('volunteers-view').style.display = tab === 'volunteers' ? 'block' : 'none';
+    loadActiveTab();
+  }
+
+  function loadActiveTab() {
+    if (currentTab === 'attendance') loadDashboard();
+    else loadVolunteers();
+  }
+
+  function loadDashboard() {
+    callServer('getAdminDashboardData', [adminToken])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        renderTable(response.events || []);
+        document.getElementById('last-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      })
+      .catch(function() {
+        document.getElementById('last-updated').textContent = 'Refresh failed - will retry automatically.';
+      });
+  }
+
+  function handleSessionExpired() {
+    clearInterval(refreshInterval);
+    document.getElementById('dashboard-container').style.display = 'none';
+    document.getElementById('gate-view').style.display = 'block';
+    document.getElementById('gate-error').textContent = 'Session expired. Please unlock again.';
+    adminToken = null;
+  }
+
+  // ---------------- Volunteers tab ----------------
+
+  function loadVolunteers() {
+    callServer('getVolunteersList', [adminToken])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        renderVolunteersTable(response.volunteers || []);
+        document.getElementById('last-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      })
+      .catch(function() {
+        document.getElementById('last-updated').textContent = 'Refresh failed - will retry automatically.';
+      });
+  }
+
+  function renderVolunteersTable(volunteers) {
+    const wrapper = document.getElementById('volunteers-table-wrapper');
+    wrapper.innerHTML = '';
+
+    if (!volunteers.length) {
+      wrapper.innerHTML = '<div class="empty-note">No volunteers added yet.</div>';
+      return;
+    }
+
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Name</th><th>PIN</th><th></th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    volunteers.forEach(function(v) {
+      const tr = document.createElement('tr');
+      tr.id = 'vol-row-' + v.row;
+
+      const nameTd = document.createElement('td');
+      nameTd.className = 'vol-name-cell';
+      nameTd.setAttribute('data-label', 'Name');
+      nameTd.textContent = v.name;
+
+      const pinTd = document.createElement('td');
+      pinTd.className = 'vol-pin-cell';
+      pinTd.setAttribute('data-label', 'PIN');
+      pinTd.textContent = v.pin;
+
+      const actionsTd = document.createElement('td');
+      actionsTd.className = 'vol-actions';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-vol-edit';
+      editBtn.textContent = 'Edit';
+      editBtn.onclick = function() { startEditVolunteer(v.row, v.name, v.pin); };
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-vol-delete';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.onclick = function() { submitDeleteVolunteer(v.row); };
+
+      actionsTd.appendChild(editBtn);
+      actionsTd.appendChild(deleteBtn);
+
+      tr.appendChild(nameTd);
+      tr.appendChild(pinTd);
+      tr.appendChild(actionsTd);
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+  }
+
+  function startEditVolunteer(row, name, pin) {
+    const tr = document.getElementById('vol-row-' + row);
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'vol-inline-input';
+    nameInput.id = 'edit-name-' + row;
+    nameInput.value = name;
+
+    const pinInput = document.createElement('input');
+    pinInput.type = 'text';
+    pinInput.className = 'vol-inline-input';
+    pinInput.id = 'edit-pin-' + row;
+    pinInput.value = pin;
+
+    const nameCell = tr.querySelector('.vol-name-cell');
+    nameCell.innerHTML = '';
+    nameCell.appendChild(nameInput);
+
+    const pinCell = tr.querySelector('.vol-pin-cell');
+    pinCell.innerHTML = '';
+    pinCell.appendChild(pinInput);
+
+    const actionsCell = tr.querySelector('.vol-actions');
+    actionsCell.innerHTML = '';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn-vol-save';
+    saveBtn.textContent = 'Save';
+    saveBtn.onclick = function() { submitUpdateVolunteer(row); };
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-vol-edit';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function() { loadVolunteers(); };
+
+    actionsCell.appendChild(saveBtn);
+    actionsCell.appendChild(cancelBtn);
+  }
+
+  function submitAddVolunteer() {
+    const name = document.getElementById('new-vol-name').value.trim();
+    const pin = document.getElementById('new-vol-pin').value.trim();
+    const statusDiv = document.getElementById('vol-status-msg');
+
+    callServer('addVolunteer', [adminToken, name, pin])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        statusDiv.className = 'vol-status-msg ' + (response.success ? 'success' : 'error');
+        statusDiv.textContent = response.message;
+        if (response.success) {
+          document.getElementById('new-vol-name').value = '';
+          document.getElementById('new-vol-pin').value = '';
+          loadVolunteers();
+        }
+      })
+      .catch(function() {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  function submitUpdateVolunteer(row) {
+    const name = document.getElementById('edit-name-' + row).value.trim();
+    const pin = document.getElementById('edit-pin-' + row).value.trim();
+    const statusDiv = document.getElementById('vol-status-msg');
+
+    callServer('updateVolunteer', [adminToken, row, name, pin])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        statusDiv.className = 'vol-status-msg ' + (response.success ? 'success' : 'error');
+        statusDiv.textContent = response.message;
+        loadVolunteers();
+      })
+      .catch(function() {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  function submitDeleteVolunteer(row) {
+    if (!confirm('Remove this volunteer? They will no longer be able to unlock the scanner with this PIN.')) return;
+
+    const statusDiv = document.getElementById('vol-status-msg');
+    callServer('deleteVolunteer', [adminToken, row])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        statusDiv.className = 'vol-status-msg ' + (response.success ? 'success' : 'error');
+        statusDiv.textContent = response.message;
+        loadVolunteers();
+      })
+      .catch(function() {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  function renderTable(events) {
+    const wrapper = document.getElementById('table-wrapper');
+    if (!events.length) {
+      wrapper.innerHTML = '<div class="empty-note">No event data yet.</div>';
+      return;
+    }
+
+    let html = '<table><thead><tr>' +
+      '<th>Event</th><th>Date</th><th>Registered</th><th>QR Sent</th>' +
+      '<th>Attended</th><th>Late</th><th>No-Show</th><th>Cancelled</th>' +
+      '</tr></thead><tbody>';
+
+    events.forEach(function(ev) {
+      html += '<tr>' +
+        '<td data-label="Event">' + escapeForDisplay(ev.eventName) + '</td>' +
+        '<td data-label="Date">' + escapeForDisplay(ev.eventDate || '—') + '</td>' +
+        '<td class="num" data-label="Registered">' + ev.registered + '</td>' +
+        '<td class="num" data-label="QR Sent">' + ev.qrSent + '</td>' +
+        '<td class="num" data-label="Attended">' + ev.attended + '</td>' +
+        '<td class="num" data-label="Late">' + ev.attendedLate + '</td>' +
+        '<td class="num" data-label="No-Show">' + ev.notAttended + '</td>' +
+        '<td class="num" data-label="Cancelled">' + ev.cancelled + '</td>' +
+        '</tr>';
+    });
+
+    html += '</tbody></table>';
+    wrapper.innerHTML = html;
+  }
+
+  function escapeForDisplay(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+</script>
+</body>
+</html>

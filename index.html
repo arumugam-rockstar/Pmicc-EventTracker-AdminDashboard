@@ -35,13 +35,13 @@
     td::before { content: attr(data-label); font-weight: 600; color: #64748b; }
   }
 
-  .tab-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tab-bar { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   .tab-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; background: #fff; color: #002855; border: 1px solid #cbd5e1; border-radius: 20px; cursor: pointer; width: auto; }
   .tab-btn.active { background: #002855; color: #fff; border-color: #002855; }
 
-  #volunteers-view { display: none; }
+  #volunteers-view, #reports-view, #branding-view { display: none; }
   .add-volunteer-form { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-  .add-volunteer-form input { flex: 1; min-width: 120px; padding: 9px 10px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px; }
+  .add-volunteer-form input, .add-volunteer-form select { flex: 1; min-width: 120px; padding: 9px 10px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px; }
   .add-volunteer-form button { width: auto; padding: 9px 16px; font-size: 13px; }
   .vol-actions button { width: auto; padding: 5px 10px; font-size: 12px; margin-left: 4px; }
   .btn-vol-edit { background: #fff; color: #002855; border: 1px solid #002855; }
@@ -51,11 +51,23 @@
   .vol-status-msg { font-size: 12px; margin-bottom: 10px; min-height: 16px; }
   .vol-status-msg.error { color: #b91c1c; }
   .vol-status-msg.success { color: #065f46; }
+
+  .brand-logo { display: block; max-width: 180px; height: auto; margin: 0 auto 14px; }
+  .dash-logo { max-height: 34px; width: auto; margin-right: 10px; vertical-align: middle; }
+  .dash-header-title-row { display: flex; align-items: center; }
+
+  .pin-field-wrap { position: relative; flex: 1; min-width: 120px; }
+  .pin-field-wrap input { width: 100%; box-sizing: border-box; padding-right: 34px; }
+  .pin-eye-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px; width: auto; color: #64748b; }
+
+  .pin-masked-cell { display: flex; align-items: center; gap: 6px; }
+  .pin-reveal-btn { background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px; width: auto; color: #64748b; }
 </style>
 </head>
 <body>
 
 <div class="gate-container" id="gate-view">
+  <img class="brand-logo" id="gate-logo" alt="PMI Chennai Chapter" style="display:none;">
   <div class="brand-title">PMI Chennai Chapter</div>
   <div class="sub-title">Admin Dashboard</div>
   <input type="password" id="admin-key-input" placeholder="Admin Access Key" autocomplete="off" onkeydown="if(event.key==='Enter'){unlockDashboard();}">
@@ -65,9 +77,12 @@
 
 <div id="dashboard-container">
   <div class="dash-header">
-    <div>
-      <h1 class="dash-title">Admin Dashboard</h1>
-      <div class="dash-updated" id="last-updated"></div>
+    <div class="dash-header-title-row">
+      <img class="dash-logo" id="dash-logo" alt="PMI Chennai Chapter" style="display:none;">
+      <div>
+        <h1 class="dash-title">Admin Dashboard</h1>
+        <div class="dash-updated" id="last-updated"></div>
+      </div>
     </div>
     <button class="btn-refresh" onclick="loadActiveTab()">↻ Refresh</button>
   </div>
@@ -75,6 +90,8 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-btn-attendance" onclick="switchTab('attendance')">Attendance</button>
     <button class="tab-btn" id="tab-btn-volunteers" onclick="switchTab('volunteers')">Volunteers</button>
+    <button class="tab-btn" id="tab-btn-reports" onclick="switchTab('reports')">Reports</button>
+    <button class="tab-btn" id="tab-btn-branding" onclick="switchTab('branding')">Branding</button>
   </div>
 
   <div id="attendance-view">
@@ -84,32 +101,51 @@
   <div id="volunteers-view">
     <div class="add-volunteer-form">
       <input type="text" id="new-vol-name" placeholder="Name">
-      <input type="text" id="new-vol-pin" placeholder="PIN (min 4 chars)">
+      <div class="pin-field-wrap">
+        <input type="password" id="new-vol-pin" placeholder="PIN (min 6 digits)">
+        <button type="button" class="pin-eye-toggle" onclick="togglePinVisibility('new-vol-pin', this)">👁</button>
+      </div>
       <button onclick="submitAddVolunteer()">+ Add Volunteer</button>
     </div>
     <div class="vol-status-msg" id="vol-status-msg"></div>
     <div id="volunteers-table-wrapper"></div>
+  </div>
+
+  <div id="reports-view">
+    <p style="font-size:13px;color:#64748b;margin-top:0;">Send a CSV attendance report for a completed event from the last 4 weeks to any email address.</p>
+    <div class="add-volunteer-form">
+      <select id="report-event-select" style="flex:2;min-width:200px;">
+        <option value="">Loading events...</option>
+      </select>
+      <input type="email" id="report-recipient-input" placeholder="Recipient email">
+      <button onclick="submitOnDemandReport()">Send Report</button>
+    </div>
+    <div class="vol-status-msg" id="report-status-msg"></div>
+  </div>
+
+  <div id="branding-view">
+    <p style="font-size:13px;color:#64748b;margin-top:0;">Replace the logo shown on both the scanner and this dashboard. Image must be under 30KB (compress at tinypng.com if needed) - this is a hard limit, since the logo is stored in a single spreadsheet cell.</p>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;color:#475569;margin-bottom:6px;">Current logo:</div>
+      <img id="current-logo-preview" style="max-width:180px;max-height:70px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;display:none;" alt="Current logo">
+      <span id="no-logo-note" style="font-size:12px;color:#94a3b8;">No logo set yet.</span>
+    </div>
+    <input type="file" id="new-logo-input" accept="image/*" onchange="previewNewLogo(this)">
+    <div id="new-logo-preview-wrap" style="display:none;margin-top:10px;">
+      <div style="font-size:12px;color:#475569;margin-bottom:6px;">New logo preview (<span id="new-logo-size"></span>):</div>
+      <img id="new-logo-preview" style="max-width:180px;max-height:70px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;" alt="New logo preview">
+    </div>
+    <button id="upload-logo-btn" onclick="submitLogoUpload()" style="width:auto;padding:9px 16px;font-size:13px;margin-top:12px;" disabled>Upload New Logo</button>
+    <div class="vol-status-msg" id="branding-status-msg"></div>
   </div>
 </div>
 
 <script>
   // ================================================================================
   // SERVER CALL LAYER — replaces google.script.run for the standalone app.
-  // Points at your deployed Apps Script /exec URL, which now also serves doPost()
-  // (see api_router.gs). Set this once per environment.
   // ================================================================================
   const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxF3_sgTH2GA8nebJ3XG3hj3d4VIchs4nOUNgM9KdjCSGVYQ1lJMD1HNdpyAeo-68QEgQ/exec';
 
-  /**
-   * Calls a whitelisted server function by name. Mirrors the shape of
-   * google.script.run: resolves with whatever the Apps Script function
-   * returned, or rejects on network/server failure.
-   *
-   * IMPORTANT: Content-Type is deliberately 'text/plain' (not application/json)
-   * so the request stays a CORS "simple request" and skips preflight — Apps
-   * Script has no doOptions() to answer one. See api_router.gs for the
-   * matching server-side note.
-   */
   async function callServer(fn, args) {
     let response;
     try {
@@ -121,28 +157,49 @@
     } catch (networkErr) {
       throw new Error('Network error — check your connection and try again.');
     }
-
-    if (!response.ok) {
-      throw new Error('Server returned HTTP ' + response.status);
-    }
-
+    if (!response.ok) throw new Error('Server returned HTTP ' + response.status);
     const data = await response.json();
     if (data && data.success === false && data.message && data.message.indexOf('Server error:') === 0) {
-      // Surfaces backend exceptions (e.g. bad args) the same way a
-      // withFailureHandler would have.
       throw new Error(data.message);
     }
     return data;
   }
 
+  // Fetches the logo before login (unauthenticated) — replaces the old
+  // server-side <?!= logoDataUri ?> scriptlet, which only works when Apps
+  // Script itself renders the page template. A static file can't do that,
+  // so this calls the new getPublicBrandLogo() function instead. See
+  // public_logo_addition.gs.
+  function loadGateLogo() {
+    callServer('getPublicBrandLogo', [])
+      .then(function(response) {
+        if (response.dataUri) {
+          document.getElementById('gate-logo').src = response.dataUri;
+          document.getElementById('gate-logo').style.display = 'block';
+        }
+      })
+      .catch(function() { /* no logo yet, or offline — leave hidden */ });
+  }
+  window.addEventListener('load', loadGateLogo);
+
   // ================================================================================
-  // Everything below is your original admin.html logic, with each
-  // google.script.run(...).fnName(args) call swapped for callServer('fnName', [args]).
-  // No other behavior changes.
+  // Everything below mirrors production admin.html, with google.script.run
+  // calls swapped for callServer('fnName', [args]). Behavior unchanged.
   // ================================================================================
 
   let adminToken = null;
   let refreshInterval = null;
+
+  function togglePinVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  }
 
   function unlockDashboard() {
     const input = document.getElementById('admin-key-input');
@@ -165,6 +222,7 @@
           adminToken = response.token;
           document.getElementById('gate-view').style.display = 'none';
           document.getElementById('dashboard-container').style.display = 'block';
+          loadDashLogo();
           loadActiveTab();
           refreshInterval = setInterval(loadActiveTab, 30000);
         } else {
@@ -179,20 +237,37 @@
       });
   }
 
+  function loadDashLogo() {
+    callServer('getCurrentLogoInfo', [adminToken])
+      .then(function(response) {
+        if (response.dataUri) {
+          document.getElementById('dash-logo').src = response.dataUri;
+          document.getElementById('dash-logo').style.display = 'inline-block';
+        }
+      })
+      .catch(function() { /* leave hidden */ });
+  }
+
   let currentTab = 'attendance';
 
   function switchTab(tab) {
     currentTab = tab;
     document.getElementById('tab-btn-attendance').classList.toggle('active', tab === 'attendance');
     document.getElementById('tab-btn-volunteers').classList.toggle('active', tab === 'volunteers');
+    document.getElementById('tab-btn-reports').classList.toggle('active', tab === 'reports');
+    document.getElementById('tab-btn-branding').classList.toggle('active', tab === 'branding');
     document.getElementById('attendance-view').style.display = tab === 'attendance' ? 'block' : 'none';
     document.getElementById('volunteers-view').style.display = tab === 'volunteers' ? 'block' : 'none';
+    document.getElementById('reports-view').style.display = tab === 'reports' ? 'block' : 'none';
+    document.getElementById('branding-view').style.display = tab === 'branding' ? 'block' : 'none';
     loadActiveTab();
   }
 
   function loadActiveTab() {
     if (currentTab === 'attendance') loadDashboard();
-    else loadVolunteers();
+    else if (currentTab === 'volunteers') loadVolunteers();
+    else if (currentTab === 'reports') loadReportEvents();
+    else loadCurrentLogoPreview();
   }
 
   function loadDashboard() {
@@ -254,7 +329,29 @@
       const pinTd = document.createElement('td');
       pinTd.className = 'vol-pin-cell';
       pinTd.setAttribute('data-label', 'PIN');
-      pinTd.textContent = v.pin;
+
+      const pinWrap = document.createElement('span');
+      pinWrap.className = 'pin-masked-cell';
+
+      const pinValueSpan = document.createElement('span');
+      pinValueSpan.className = 'pin-value-span';
+      pinValueSpan.textContent = '•'.repeat(v.pin.length || 6);
+      pinValueSpan.dataset.pin = v.pin;
+      pinValueSpan.dataset.revealed = 'false';
+
+      const revealBtn = document.createElement('button');
+      revealBtn.type = 'button';
+      revealBtn.className = 'pin-reveal-btn';
+      revealBtn.textContent = '👁';
+      revealBtn.onclick = function() {
+        const revealed = pinValueSpan.dataset.revealed === 'true';
+        pinValueSpan.textContent = revealed ? '•'.repeat(v.pin.length || 6) : v.pin;
+        pinValueSpan.dataset.revealed = revealed ? 'false' : 'true';
+      };
+
+      pinWrap.appendChild(pinValueSpan);
+      pinWrap.appendChild(revealBtn);
+      pinTd.appendChild(pinWrap);
 
       const actionsTd = document.createElement('td');
       actionsTd.className = 'vol-actions';
@@ -292,10 +389,21 @@
     nameInput.value = name;
 
     const pinInput = document.createElement('input');
-    pinInput.type = 'text';
+    pinInput.type = 'password';
     pinInput.className = 'vol-inline-input';
     pinInput.id = 'edit-pin-' + row;
     pinInput.value = pin;
+
+    const pinInputWrap = document.createElement('span');
+    pinInputWrap.className = 'pin-field-wrap';
+    pinInputWrap.style.display = 'inline-block';
+    const pinEditToggle = document.createElement('button');
+    pinEditToggle.type = 'button';
+    pinEditToggle.className = 'pin-eye-toggle';
+    pinEditToggle.textContent = '👁';
+    pinEditToggle.onclick = function() { togglePinVisibility('edit-pin-' + row, pinEditToggle); };
+    pinInputWrap.appendChild(pinInput);
+    pinInputWrap.appendChild(pinEditToggle);
 
     const nameCell = tr.querySelector('.vol-name-cell');
     nameCell.innerHTML = '';
@@ -303,7 +411,7 @@
 
     const pinCell = tr.querySelector('.vol-pin-cell');
     pinCell.innerHTML = '';
-    pinCell.appendChild(pinInput);
+    pinCell.appendChild(pinInputWrap);
 
     const actionsCell = tr.querySelector('.vol-actions');
     actionsCell.innerHTML = '';
@@ -374,6 +482,148 @@
         loadVolunteers();
       })
       .catch(function() {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  // ---------------- Reports tab ----------------
+
+  function loadReportEvents() {
+    const select = document.getElementById('report-event-select');
+    callServer('getRecentCompletedEvents', [adminToken])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        const events = response.events || [];
+        select.innerHTML = '';
+        if (!events.length) {
+          select.innerHTML = '<option value="">No completed events in the last 4 weeks</option>';
+          return;
+        }
+        select.innerHTML = '<option value="">Select an event...</option>';
+        events.forEach(function(ev) {
+          const opt = document.createElement('option');
+          opt.value = ev.eventName;
+          opt.textContent = ev.eventName + ' (' + ev.eventDate + ')';
+          select.appendChild(opt);
+        });
+      })
+      .catch(function() {
+        select.innerHTML = '<option value="">Failed to load events</option>';
+      });
+  }
+
+  function submitOnDemandReport() {
+    const eventName = document.getElementById('report-event-select').value;
+    const recipient = document.getElementById('report-recipient-input').value.trim();
+    const statusDiv = document.getElementById('report-status-msg');
+
+    if (!eventName) { statusDiv.className = 'vol-status-msg error'; statusDiv.textContent = 'Please select an event.'; return; }
+    if (!recipient) { statusDiv.className = 'vol-status-msg error'; statusDiv.textContent = 'Please enter a recipient email.'; return; }
+
+    statusDiv.className = 'vol-status-msg';
+    statusDiv.textContent = 'Sending...';
+
+    callServer('sendOnDemandReport', [adminToken, eventName, recipient])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        statusDiv.className = 'vol-status-msg ' + (response.success ? 'success' : 'error');
+        statusDiv.textContent = response.message;
+      })
+      .catch(function() {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'Something went wrong. Please try again.';
+      });
+  }
+
+  // ---------------- Branding tab ----------------
+
+  let pendingLogoBase64 = null;
+  let pendingLogoMimeType = null;
+  const MAX_LOGO_BYTES = 30 * 1024;
+
+  function loadCurrentLogoPreview() {
+    callServer('getCurrentLogoInfo', [adminToken])
+      .then(function(response) {
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        const img = document.getElementById('current-logo-preview');
+        const note = document.getElementById('no-logo-note');
+        if (response.dataUri) {
+          img.src = response.dataUri;
+          img.style.display = 'inline-block';
+          note.style.display = 'none';
+        } else {
+          img.style.display = 'none';
+          note.style.display = 'inline';
+        }
+      })
+      .catch(function() { /* leave whatever was showing */ });
+  }
+
+  function previewNewLogo(input) {
+    const file = input.files[0];
+    const uploadBtn = document.getElementById('upload-logo-btn');
+    const statusDiv = document.getElementById('branding-status-msg');
+    statusDiv.textContent = '';
+    statusDiv.className = 'vol-status-msg';
+    uploadBtn.disabled = true;
+    pendingLogoBase64 = null;
+    pendingLogoMimeType = null;
+
+    if (!file) {
+      document.getElementById('new-logo-preview-wrap').style.display = 'none';
+      return;
+    }
+
+    const sizeKb = (file.size / 1024).toFixed(1);
+    document.getElementById('new-logo-size').textContent = sizeKb + 'KB';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      const commaIdx = dataUrl.indexOf(',');
+      pendingLogoBase64 = dataUrl.substring(commaIdx + 1);
+      pendingLogoMimeType = file.type;
+
+      document.getElementById('new-logo-preview').src = dataUrl;
+      document.getElementById('new-logo-preview-wrap').style.display = 'block';
+
+      if (file.size > MAX_LOGO_BYTES) {
+        statusDiv.className = 'vol-status-msg error';
+        statusDiv.textContent = 'This image is ' + sizeKb + 'KB - please use one under ' + (MAX_LOGO_BYTES / 1024) + 'KB.';
+        uploadBtn.disabled = true;
+      } else {
+        uploadBtn.disabled = false;
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function submitLogoUpload() {
+    if (!pendingLogoBase64) return;
+    const uploadBtn = document.getElementById('upload-logo-btn');
+    const statusDiv = document.getElementById('branding-status-msg');
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+
+    callServer('updateBrandLogo', [adminToken, pendingLogoBase64, pendingLogoMimeType])
+      .then(function(response) {
+        uploadBtn.textContent = 'Upload New Logo';
+        if (response.sessionExpired) { handleSessionExpired(); return; }
+        statusDiv.className = 'vol-status-msg ' + (response.success ? 'success' : 'error');
+        statusDiv.textContent = response.message;
+        uploadBtn.disabled = !response.success;
+        if (response.success) {
+          loadCurrentLogoPreview();
+          loadDashLogo();
+          document.getElementById('new-logo-input').value = '';
+          document.getElementById('new-logo-preview-wrap').style.display = 'none';
+          pendingLogoBase64 = null;
+        }
+      })
+      .catch(function() {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload New Logo';
         statusDiv.className = 'vol-status-msg error';
         statusDiv.textContent = 'Something went wrong. Please try again.';
       });
